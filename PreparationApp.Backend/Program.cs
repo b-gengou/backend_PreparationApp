@@ -42,6 +42,7 @@ builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
 })
+    
 .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
 {
     var clientId = builder.Configuration["Google:ClientId"] ?? string.Empty;
