@@ -1,4 +1,4 @@
-//Service pour interagir avec l'API Google Calendar.
+// Service pour interagir avec l'API Google Calendar.
 
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
@@ -14,7 +14,7 @@ public class GoogleCalendarService
     private readonly IConfiguration _configuration;
 
     // Constructeur du service.
-    // L'injection de dépendance fournit automatiquement la configuration.
+    // L'injection de dépendance fournit automatiquement la confi.
     public GoogleCalendarService(IConfiguration configuration)
     {
         _configuration = configuration;
@@ -61,7 +61,7 @@ public class GoogleCalendarService
             ApplicationName = "PreparationApp"
         });
 
-        // --> Configuration de la requête
+        // --> Config. de la requête
         var request = service.Events.List("primary");
         request.Q = "préparation"; // Filtre les événements contenant "préparation"
         request.TimeMinDateTimeOffset = DateTimeOffset.Now; // À partir de maintenant

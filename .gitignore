@@ -482,5 +482,6 @@ $RECYCLE.BIN/
 *.swp
 
 # Fichiers de config sensibles
+appsettings.json
 appsettings.Development.json
 appsettings.Production.json

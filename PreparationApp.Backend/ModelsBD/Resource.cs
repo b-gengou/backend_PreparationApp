@@ -1,30 +1,55 @@
+// Modèle "Resource" (support de cours : PDF, vidéo, lien...).
+// Une ressource peut être associée à plusieurs préparations (relation N:N,
+// cf. PreparationResource.cs et AppDbContext.cs).
+// CreatedById permet de savoir qui a ajouté cette ressource au catalogue,
+// pour appliquer la règle de droits : seul le créateur ou un admin peut
+// modifier/supprimer une ressource (voir ResourcesController.cs).
+
+
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PreparationApp.Backend.ModelsBD;
 
-// Modèle représentant une ressource (document, lien, etc.) dans l'application.
+// Modèle représentant une ressource pour une préparation.
+// Une ressource peut être associée à plusieurs préparations (relation N:N).
 public class Resource
 {
     // Identifiant unique de la ressource (clef primaire).
     [Key]
     public int Id { get; set; }
 
-    // Titre de la ressource.
-    [Required(ErrorMessage = "Le titre de la ressource est obligatoire.")]
-    [StringLength(255, ErrorMessage = "Le titre ne peut pas dépasser 255 caractères.")]
-    public string Title { get; set; } = string.Empty;
+    // Nom de la ressource (ex. : "PDF du cours", "Lien vers la vidéo").
+    [Required(ErrorMessage = "Le nom de la ressource est obligatoire.")]
+    [StringLength(255, ErrorMessage = "Le nom ne peut pas dépasser 255 caractères.")]
+    public string Name { get; set; } = string.Empty;
 
-    // Type de la ressource (ex: "PDF", "Lien", "Vidéo").
-    [Required(ErrorMessage = "Le type de la ressource est obligatoire.")]
+    // URL ou chemin vers la ressource.
+    [Required(ErrorMessage = "L'URL de la ressource est obligatoire.")]
+    [StringLength(1000, ErrorMessage = "L'URL ne peut pas dépasser 1000 caractères.")]
+    public string Url { get; set; } = string.Empty;
+
+    // Type de la ressource (ex. : "PDF", "Vidéo", "Lien").
     [StringLength(50, ErrorMessage = "Le type ne peut pas dépasser 50 caractères.")]
     public string Type { get; set; } = string.Empty;
 
-    // Lien vers la ressource.
-    [StringLength(500, ErrorMessage = "Le lien ne peut pas dépasser 500 caractères.")]
-    [RegularExpression(@"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$", ErrorMessage = "Le lien doit être une URL valide.")]
-    public string Link { get; set; } = string.Empty;
+    
+    // Id. du formateur qui a créé cette ressource (clef étrangère).
+    // Obligatoire : on doit toujours savoir qui a ajouté une ressource,
+    // pour pouvoir appliquer la règle "seul le créateur ou l'admin peut modifier".
+    
+    [Required(ErrorMessage = "Le créateur de la ressource est obligatoire.")]
+    public int CreatedById { get; set; }
 
-    // Liste des préparations associées à cette ressource (relation N:N).
+    // Propriété de navigation : permet d'accéder directement à l'objet
+    // Formateur complet depuis une Resource (ex. : resource.CreatedBy.Name).
+    
+    [ForeignKey("CreatedById")]
+    public Formateur CreatedBy { get; set; } = null!;
+
+    // Date de création de la ressource, remplie automatiquement par le serveur.
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Liste des préparations associées à cette ressource (relation N:N via PreparationResource).
     public ICollection<PreparationResource> PreparationResources { get; set; } = new List<PreparationResource>();
 }

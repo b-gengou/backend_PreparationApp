@@ -3,22 +3,23 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PreparationApp.Backend.ModelsBD;
 
-// Modèle représentant la relation entre une préparation et une ressource (table de jointure pour la relation N:N).
+// Modèle représentant la table de jointure entre Preparation et Resource.
+// Permet de gérer la relation N:N entre préparations et ressources.
 public class PreparationResource
 {
     // Identifiant de la préparation (clef étrangère).
-    [Required(ErrorMessage = "L'ID de la préparation est obligatoire.")]
+    [Required(ErrorMessage = "La préparation est obligatoire pour une ressource.")]
     public int PreparationId { get; set; }
 
-    // Objet Preparation associé (propriété de navigation).
+    // Préparation associée (propriété de navigation).
     [ForeignKey("PreparationId")]
     public Preparation Preparation { get; set; } = null!;
 
     // Identifiant de la ressource (clef étrangère).
-    [Required(ErrorMessage = "L'ID de la ressource est obligatoire.")]
+    [Required(ErrorMessage = "La ressource est obligatoire.")]
     public int ResourceId { get; set; }
 
-    // Objet Resource associé (propriété de navigation).
+    // Ressource associée (propriété de navigation).
     [ForeignKey("ResourceId")]
     public Resource Resource { get; set; } = null!;
 }

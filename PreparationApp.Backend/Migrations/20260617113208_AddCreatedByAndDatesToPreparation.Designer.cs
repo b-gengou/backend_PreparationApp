@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PreparationApp.Backend.ModelsBD;
 
@@ -11,9 +12,11 @@ using PreparationApp.Backend.ModelsBD;
 namespace PreparationApp.Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617113208_AddCreatedByAndDatesToPreparation")]
+    partial class AddCreatedByAndDatesToPreparation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -40,6 +43,9 @@ namespace PreparationApp.Backend.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<bool>("IsAdmin")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -49,11 +55,6 @@ namespace PreparationApp.Backend.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
 
                     b.HasKey("Id");
 
@@ -202,7 +203,7 @@ namespace PreparationApp.Backend.Migrations
 
                     b.HasIndex("PreparationId");
 
-                    b.ToTable("Reports");
+                    b.ToTable("PreparationReports");
                 });
 
             modelBuilder.Entity("PreparationApp.Backend.ModelsBD.PreparationResource", b =>
@@ -230,13 +231,12 @@ namespace PreparationApp.Backend.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("Link")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
-                    b.Property<int>("CreatedById")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
+                    b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -246,14 +246,7 @@ namespace PreparationApp.Backend.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("CreatedById");
 
                     b.ToTable("Resources");
                 });
@@ -263,7 +256,7 @@ namespace PreparationApp.Backend.Migrations
                     b.HasOne("PreparationApp.Backend.ModelsBD.Formateur", "CreatedBy")
                         .WithMany("CreatedPreparations")
                         .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("PreparationApp.Backend.ModelsBD.Formateur", "Formateur")
@@ -305,17 +298,6 @@ namespace PreparationApp.Backend.Migrations
                     b.Navigation("Preparation");
 
                     b.Navigation("Resource");
-                });
-
-            modelBuilder.Entity("PreparationApp.Backend.ModelsBD.Resource", b =>
-                {
-                    b.HasOne("PreparationApp.Backend.ModelsBD.Formateur", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedBy");
                 });
 
             modelBuilder.Entity("PreparationApp.Backend.ModelsBD.Formateur", b =>

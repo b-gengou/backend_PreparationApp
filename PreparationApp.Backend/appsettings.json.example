@@ -1,0 +1,51 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=VOTRE_SERVEUR_SQL;Database=PreparationApp;Trusted_Connection=True;TrustServerCertificate=True;"
+  },
+  "Kestrel": {
+    "Endpoints": {
+      "Http": {
+        "Url": "http://localhost:5000"
+      },
+      "Https": {
+        "Url": "https://localhost:5001"
+      }
+    }
+  },
+  "Jwt": {
+    "Key": "REMPLACEZ_PAR_UNE_CLE_SECRETE_LONGUE_ET_ALEATOIRE_MINIMUM_32_CARACTERES",
+    "Issuer": "PreparationApp",
+    "Audience": "PreparationApp"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Swagger": {
+    "Enabled": true,
+    "Title": "PreparationApp API",
+    "Version": "v1",
+    "Description": "API pour gérer les préparations, formateurs et rapports.",
+    "RoutePrefix": "swagger",
+    "JsonRoute": "swagger/v1/swagger.json"
+  },
+  "Google": {
+    "ClientId": "votre_client_id_google.apps.googleusercontent.com",
+    "ClientSecret": "votre_client_secret_google",
+    "Credentials": {
+      "type": "service_account",
+      "project_id": "votre_projet_id",
+      "private_key_id": "votre_clef_privee_id",
+      "private_key": "-----BEGIN PRIVATE KEY-----\nVOTRE_CLEF_PRIVEE\n-----END PRIVATE KEY-----\n",
+      "client_email": "votre_email_service@votre_projet.iam.gserviceaccount.com",
+      "client_id": "votre_client_id",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/votre_email_service%40votre_projet.iam.gserviceaccount.com"
+    }
+  }
+}

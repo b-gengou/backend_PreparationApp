@@ -1,0 +1,32 @@
+# -----------------------------------------------------------------------------
+# Pipeline d'intégration continue (CI) pour le backend PreparationApp.
+# Cahier des charges : section 4.1 (contraintes techniques)
+# et section 9 (livrables - "Code source versionné... pipeline CI/CD").
+# -----------------------------------------------------------------------------
+
+name: CI Backend
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code du dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer le SDK .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurer les dépendances NuGet
+        run: dotnet restore PreparationApp.Backend/PreparationApp.Backend.csproj
+
+      - name: Compiler le projet
+        run: dotnet build PreparationApp.Backend/PreparationApp.Backend.csproj --no-restore

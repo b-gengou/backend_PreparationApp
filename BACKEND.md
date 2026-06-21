@@ -8,7 +8,7 @@ Il gère :
 - Les **formateurs** et leurs disponibilités.
 - La **synchronisation avec Google Calendar**.
 - L’**export/import depuis Google Sheets**.
-- La **base de données SQL Server**.
+- La **BD de SQL Server**.
 
 ---
 
@@ -43,7 +43,7 @@ backend/
 │   ├── PreparationReport.cs           # Modèle EF Core pour les rapports
 │   ├── PreparationResource.cs         # Modèle pour les ressources liées aux préparations
 │   ├── Resource.cs                    # Modèle pour les ressources
-│   └── AppDbContext.cs                # Contexte EF Core pour la base de données
+│   └── AppDbContext.cs                # Contexte EF Core pour la BD
 │
 ├── 📁 Services/
 │   ├── GoogleCalendarService.cs       # Service pour interagir avec Google Calendar

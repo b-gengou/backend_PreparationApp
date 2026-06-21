@@ -1,0 +1,33 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=VOTRE_SERVEUR_SQL;Database=PreparationApp_Dev;Trusted_Connection=True;TrustServerCertificate=True;"
+  },
+  "Google": {
+    "ClientId": "votre_client_id_dev.apps.googleusercontent.com",
+    "ClientSecret": "votre_client_secret_dev"
+  },
+  "Swagger": {
+    "Enabled": true,
+    "Title": "PreparationApp API (Dev)",
+    "Version": "v1",
+    "Description": "API de développement pour gérer les préparations, formateurs et rapports.",
+    "RoutePrefix": "swagger",
+    "JsonRoute": "swagger/v1/swagger.json"
+  },
+  "Jwt": {
+    "Key": "REMPLACEZ_PAR_UNE_CLE_SECRETE_LONGUE_ET_ALEATOIRE",
+    "Issuer": "PreparationApp",
+    "Audience": "PreparationAppClient",
+    "ValidateIssuer": true,
+    "ValidateAudience": true,
+    "ValidateLifetime": true,
+    "ValidateIssuerSigningKey": true
+  }
+}
