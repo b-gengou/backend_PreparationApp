@@ -1,8 +1,8 @@
-# -----------------------------------------------------------------------------
 # Pipeline d'intégration continue (CI) pour le backend PreparationApp.
-# Cahier des charges : section 4.1 (contraintes techniques)
+# Exigé par le cahier des charges : section 4.1 (contraintes techniques)
 # et section 9 (livrables - "Code source versionné... pipeline CI/CD").
-# -----------------------------------------------------------------------------
+# Ce pipeline compile le projet principal & !!!  exécute les tests automatisés
+# (PreparationApp.Backend.Tests) à chaque push ou pull request sur main.
 
 name: CI Backend
 
@@ -30,3 +30,9 @@ jobs:
 
       - name: Compiler le projet
         run: dotnet build PreparationApp.Backend/PreparationApp.Backend.csproj --no-restore
+
+      - name: Restaurer les dépendances du projet de tests
+        run: dotnet restore PreparationApp.Backend.Tests/PreparationApp.Backend.Tests.csproj
+
+      - name: Lancer les tests automatisés
+        run: dotnet test PreparationApp.Backend.Tests/PreparationApp.Backend.Tests.csproj --no-restore
