@@ -28,31 +28,33 @@ Il gère :
 ---
 
 ## **Structure du Dossier `backend/`**
-
-backend/
-│
-├── 📁 Controllers/
-│   ├── FormateursController.cs       # Gère les requêtes HTTP pour les formateurs
-│   ├── PreparationsController.cs     # Gère les requêtes HTTP pour les préparations
-│   └── PreparationReportsController.cs # Gère les rapports de préparation
-│   └── SheetsController
-│
-├── 📁 ModelsBD/
-│   ├── Formateur.cs                   # Modèle EF Core pour les formateurs
-│   ├── Preparation.cs                 # Modèle EF Core pour les préparations
-│   ├── PreparationReport.cs           # Modèle EF Core pour les rapports
-│   ├── PreparationResource.cs         # Modèle pour les ressources liées aux préparations
-│   ├── Resource.cs                    # Modèle pour les ressources
-│   └── AppDbContext.cs                # Contexte EF Core pour la BD
-│
-├── 📁 Services/
-│   ├── GoogleCalendarService.cs       # Service pour interagir avec Google Calendar
-│   └── GoogleSheetsService.cs         # Service pour interagir avec Google Sheets
-│
-├── 📁 Properties/
-│   ├── launchSettings.json            # Configuration des profils de lancement (ports, environnement)
-│   └── appsettings.Development.json    # Configuration spécifique au développement
-│
-├── Program.cs                   # Point d'entrée de l'application (configuration des services, middleware)
-├── appsettings.json             # Configuration générale (chaînes de connexion, clés API, etc.)
-└── BACKEND.md                    # Ce fichier (documentation)
+```bash
+backend_PreparationApp/
+├── .github/workflows/ci.yml               # Pipeline CI/CD
+├── .gitignore
+├── BACKEND.md                             # Ce fichier (documentation)
+├── ECARTS_CAHIER_DES_CHARGES.md           # Documentation des écarts
+├── PreparationApp.Backend/
+│   ├── Controllers/
+│   │   ├── AuthController.cs
+│   │   ├── FormateursController.cs          # Gère les requêtes HTTP pour les formateurs
+│   │   ├── PreparationsController.cs        # Gère les requêtes HTTP pour les préparations
+│   │   ├── PreparationReportsController.cs  # Gère les rapports de préparation
+│   │   └── ResourcesController.cs
+│   ├── ModelsBD/
+│   │   ├── AppDbContext.cs                  # Contexte EF Core pour la BD
+│   │   ├── Formateur.cs                     # Modèle EF Core pour les formateurs
+│   │   ├── Preparation.cs                   # Modèle EF Core pour les préparations
+│   │   ├── PreparationReport.cs             # Modèle EF Core pour les rapports
+│   │   ├── Resource.cs                      # Modèle pour les ressources
+│   │   └── PreparationResource.cs           # Modèle pour les ressources liées aux préparations
+│   ├── Services/
+│   │   ├── GoogleCalendarService.cs         # Service pour interagir avec Google Calendar
+│   │   └── GoogleSheetsService.cs           # Service pour interagir avec Google Sheets
+│   ├── Migrations/                          # Historique des migrations EF Core
+│   ├── Program.cs                           # Point d'entrée de l'application (configuration des services, middleware)
+│   ├── appsettings.json.example             # Modèle sans secrets
+│   └── appsettings.Development.json.example
+└── PreparationApp.Backend.Tests/
+    ├── PreparationsControllerTests.cs
+    └── ResourcesControllerTests.cs

@@ -1,8 +1,6 @@
-
 // Contrôleur pour gérer l'authentification des utilisateurs (formateurs).
 // Permet la connexion, l'inscription, et la gestion des rôles (Admin = "1", Formateur = "2").
 // ce contrôleur lit et écrit directement formateur.Role
-// au lieu de devoir convertir un booléen en "1"/"2" à chaque fois.
 
 
 using Microsoft.AspNetCore.Mvc;
@@ -45,6 +43,15 @@ public class AuthController : ControllerBase
             if (formateur == null || formateur.Password != model.Password)
             {
                 return Unauthorized(new { message = "Email ou mot de passe incorrect." });
+            }
+
+            // Un compte désactivé (ex. : formateur ou admin qui a quitté
+            // l'entreprise) ne peut plus se connecter. Ses données restent
+            // toutefois intactes en base et visibles par les autres (voir
+            // Formateur.IsActive et Formateur.DisplayName).
+            if (!formateur.IsActive)
+            {
+                return Unauthorized(new { message = "Ce compte a été désactivé. Contactez un administrateur." });
             }
 
             // Génère le token JWT avec le rôle (Admin = "1", Formateur = "2").
@@ -122,7 +129,7 @@ public class AuthController : ControllerBase
     // BD, est inscrit dans le token sous forme de "claim"
     // (ClaimTypes.Role). Ensuite, à chaque requête protégée, le backend
     // n'a plus besoin de retourner consulter la base : il lit directement
-    // ce claim depuis le token reçu (voir [Authorize(Policy = "AdminOnly")]
+    // ce claim depuis le token reçu (cf.  [Authorize(Policy = "AdminOnly")]
     // dans les contrôleurs, ou User.FindFirst(ClaimTypes.Role) dans le code).
 
     private string GenerateJwtToken(Formateur formateur)
@@ -136,7 +143,7 @@ public class AuthController : ControllerBase
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        // Définit les claims (informations encodées à l'intérieur du token).
+        // Définit les claims (infos encodées à l'intérieur du token).
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, formateur.Id.ToString()),

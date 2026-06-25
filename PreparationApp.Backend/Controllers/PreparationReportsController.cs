@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PreparationApp.Backend.ModelsBD;
+using PreparationApp.Backend.ModelsBD.Dtos;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace PreparationApp.Backend.Controllers;
@@ -74,15 +76,33 @@ public class PreparationReportsController : ControllerBase
     
     [Authorize(Policy = "FormateurOnly")]
     [HttpPost]
-    public async Task<IActionResult> PostPreparationReport(PreparationReport report)
+    public async Task<IActionResult> PostPreparationReport(PreparationReportDto dto)
     {
         try
         {
+            // Validation manuelle des URLs : on n'applique [Url] que si le
+            // champ n'est pas vide, car un lien de répertoire est optionnel
+            // (contrairement à [Url] sur le modèle EF Core, qui rejetait
+            // aussi une chaîne vide selon la version de .NET utilisée).
+            var urlAttribute = new UrlAttribute();
+            if (!string.IsNullOrEmpty(dto.DirectoryLink) && !urlAttribute.IsValid(dto.DirectoryLink))
+            {
+                ModelState.AddModelError(nameof(dto.DirectoryLink), "Le lien vers le répertoire doit être une URL valide.");
+            }
+            if (!string.IsNullOrEmpty(dto.WorkDirectoryLink) && !urlAttribute.IsValid(dto.WorkDirectoryLink))
+            {
+                ModelState.AddModelError(nameof(dto.WorkDirectoryLink), "Le lien vers le répertoire de travail doit être une URL valide.");
+            }
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
             // Vérifie que la préparation existe.
-            var preparation = await _context.Preparations.FindAsync(report.PreparationId);
+            var preparation = await _context.Preparations.FindAsync(dto.PreparationId);
             if (preparation == null)
             {
-                return BadRequest(new { Error = $"Aucune préparation trouvée avec l'ID {report.PreparationId}." });
+                return BadRequest(new { Error = $"Aucune préparation trouvée avec l'ID {dto.PreparationId}." });
             }
 
             // Récupère l'identifiant et le rôle de l'utilisateur connecté
@@ -107,15 +127,30 @@ public class PreparationReportsController : ControllerBase
                 return Forbid(); // 403 Interdit
             }
 
-            // Il faut remplir automatiquement le courriel du formateur connecté
-            // et la date de création, plutôt que de dépendre du frontend pour
-            // ces deux champs. C'est plus fiable et cela évite des erreurs de
-            // validation si le frontend oublie de les envoyer
-            // (le champ Email est [Required] dans PreparationReport.cs).
-
+            // Mappe le DTO (champs saisis par le formateur) vers l'entité
+            // EF Core, puis il faut compléter nous-mêmes les champs serveur
+            // (Email et CreatedAt) qui ne doivent jamais venir du frontend.
             var currentUserEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-            report.Email = currentUserEmail ?? string.Empty;
-            report.CreatedAt = DateTime.UtcNow;
+
+            var report = new PreparationReport
+            {
+                SubjectsCovered = dto.SubjectsCovered,
+                DailyObjectives = dto.DailyObjectives,
+                ReferenceSupports = dto.ReferenceSupports,
+                DirectoryLink = dto.DirectoryLink,
+                ModifiedFiles = dto.ModifiedFiles,
+                NewExercises = dto.NewExercises,
+                WorkDirectoryLink = dto.WorkDirectoryLink,
+                PlannedDate = dto.PlannedDate,
+                CourseDurationDays = dto.CourseDurationDays,
+                TechnicalIssues = dto.TechnicalIssues,
+                SecondOpinionNeed = dto.SecondOpinionNeed,
+                SecondOpinionAction = dto.SecondOpinionAction,
+                TimeSpent = dto.TimeSpent,
+                PreparationId = dto.PreparationId,
+                Email = currentUserEmail ?? string.Empty,
+                CreatedAt = DateTime.UtcNow,
+            };
 
             _context.Reports.Add(report);
             await _context.SaveChangesAsync();
@@ -135,13 +170,24 @@ public class PreparationReportsController : ControllerBase
 
     [Authorize(Policy = "FormateurOnly")]
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutPreparationReport(int id, PreparationReport report)
+    public async Task<IActionResult> PutPreparationReport(int id, PreparationReportDto dto)
     {
         try
         {
-            if (id != report.Id)
+            // Même validation manuelle des URLs que pour le POST (cf. 
+            // commentaire détaillé dans PostPreparationReport).
+            var urlAttribute = new UrlAttribute();
+            if (!string.IsNullOrEmpty(dto.DirectoryLink) && !urlAttribute.IsValid(dto.DirectoryLink))
             {
-                return BadRequest(new { Error = "L'ID du compte-rendu ne correspond pas." });
+                ModelState.AddModelError(nameof(dto.DirectoryLink), "Le lien vers le répertoire doit être une URL valide.");
+            }
+            if (!string.IsNullOrEmpty(dto.WorkDirectoryLink) && !urlAttribute.IsValid(dto.WorkDirectoryLink))
+            {
+                ModelState.AddModelError(nameof(dto.WorkDirectoryLink), "Le lien vers le répertoire de travail doit être une URL valide.");
+            }
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
             }
 
             var existingReport = await _context.Reports
@@ -151,6 +197,13 @@ public class PreparationReportsController : ControllerBase
             if (existingReport == null)
             {
                 return NotFound(new { Error = $"Aucun compte-rendu trouvé avec l'ID {id}." });
+            }
+
+            // Vérifie que le compte-rendu modifié reste bien rattaché à
+            // la même préparation que celle envoyée dans le DTO.
+            if (dto.PreparationId != existingReport.PreparationId)
+            {
+                return BadRequest(new { Error = "Impossible de rattacher ce compte-rendu à une autre préparation." });
             }
 
             var currentUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -173,12 +226,23 @@ public class PreparationReportsController : ControllerBase
                 return Forbid(); // 403 Interdit
             }
 
-            // On conserve le courriel et la date de création d'origine, pour ne
-            // pas les écraser par erreur lors d'une modification.
-            report.Email = existingReport.Email;
-            report.CreatedAt = existingReport.CreatedAt;
+            // Met à jour uniquement les champs modifiables par le
+            // formateur. Email, CreatedAt, Id et PreparationId restent
+            // ceux de l'entité existante en base, jamais ceux du DTO.
+            existingReport.SubjectsCovered = dto.SubjectsCovered;
+            existingReport.DailyObjectives = dto.DailyObjectives;
+            existingReport.ReferenceSupports = dto.ReferenceSupports;
+            existingReport.DirectoryLink = dto.DirectoryLink;
+            existingReport.ModifiedFiles = dto.ModifiedFiles;
+            existingReport.NewExercises = dto.NewExercises;
+            existingReport.WorkDirectoryLink = dto.WorkDirectoryLink;
+            existingReport.PlannedDate = dto.PlannedDate;
+            existingReport.CourseDurationDays = dto.CourseDurationDays;
+            existingReport.TechnicalIssues = dto.TechnicalIssues;
+            existingReport.SecondOpinionNeed = dto.SecondOpinionNeed;
+            existingReport.SecondOpinionAction = dto.SecondOpinionAction;
+            existingReport.TimeSpent = dto.TimeSpent;
 
-            _context.Entry(report).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
             return NoContent();

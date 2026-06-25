@@ -1,6 +1,5 @@
 // Ce contrôleur gère le "catalogue des supports" exigé par le cahier des charges
 // (section 3.1 - MVP : "Catalogue des supports" ; US015 et US016).
-//
 // Règles --> rôle "1" = admin, rôle "2" = formateur
 // a) Consulter/rechercher (GET) : tout utilisateur connecté.
 // b) Créer (POST) : tout utilisateur connecté (formateur ou admin).
@@ -10,6 +9,7 @@ using Microsoft.AspNetCore.Authorization; // Fournit [Authorize] pour protéger 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PreparationApp.Backend.ModelsBD;
+using PreparationApp.Backend.ModelsBD.Dtos;
 using System.Security.Claims;             // Fournit ClaimTypes pour lire les infos du token JWT.
 
 namespace PreparationApp.Backend.Controllers;
@@ -28,7 +28,7 @@ public class ResourcesController : ControllerBase
 
     // GET: api/resources
     // GET: api/resources?search=sql&type=PDF&formateurId=1&date=2026-06-15
-    // Récupère la liste des ressources, avec recherche par mot-clé et filtres
+    // Récupère la liste des ressources, avec recherche par mot-clef et filtres
     // optionnels par type, formateur et date (US015 et US016).
     // Règle : tout utilisateur connecté peut consulter toutes les ressources,
     // peu importe qui les a créées --> catalogue partagé entre tous les formateurs.
@@ -117,7 +117,7 @@ public class ResourcesController : ControllerBase
 
     [Authorize]
     [HttpPost]
-    public async Task<IActionResult> CreateResource([FromBody] Resource resource)
+    public async Task<IActionResult> CreateResource([FromBody] ResourceDto dto)
     {
         try
         {
@@ -129,11 +129,19 @@ public class ResourcesController : ControllerBase
             }
             var currentUserId = int.Parse(currentUserIdClaim);
 
-            // Force le créateur à être l'utilisateur connecté, pour éviter
-            // qu'un utilisateur qui a été bercé trop près du mur attribue la ressource à quelqu'un d'autre.
-
-            resource.CreatedById = currentUserId;
-            resource.CreatedAt = DateTime.UtcNow;
+            // Mappe le DTO (champs saisis dans le formulaire) vers
+            // l'entité EF Core, puis on doit compléter nous-mêmes CreatedById et
+            // CreatedAt : ces champs ne doivent jamais venir du frontend,
+            // qui ne connaît de toute façon pas l'id. du Formateur connecté
+            // (seulement son token JWT).
+            var resource = new Resource
+            {
+                Name = dto.Name,
+                Url = dto.Url,
+                Type = dto.Type,
+                CreatedById = currentUserId,
+                CreatedAt = DateTime.UtcNow,
+            };
 
             _context.Resources.Add(resource);
             await _context.SaveChangesAsync();
@@ -147,19 +155,14 @@ public class ResourcesController : ControllerBase
     }
     // PUT: api/resources/5
     // Met à jour une ressource existante.
-    // Règle : seul le créateur de la ressource OU un admin (rôle "1") peut modifier.
+    // Règle : seul le créateur de la ressource ou un admin (rôle "1") peut modifier.
 
     [Authorize]
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateResource(int id, [FromBody] Resource resource)
+    public async Task<IActionResult> UpdateResource(int id, [FromBody] ResourceDto dto)
     {
         try
         {
-            if (id != resource.Id)
-            {
-                return BadRequest(new { Error = "L'ID de la ressource ne correspond pas." });
-            }
-
             var currentUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(currentUserIdClaim))
             {
@@ -188,10 +191,10 @@ public class ResourcesController : ControllerBase
 
             // Met à jour les champs modifiables : ne pas toucher pas à CreatedById/CreatedAt,
             // qui doivent rester ceux d'origine
-            
-            existingResource.Name = resource.Name;
-            existingResource.Url = resource.Url;
-            existingResource.Type = resource.Type;
+
+            existingResource.Name = dto.Name;
+            existingResource.Url = dto.Url;
+            existingResource.Type = dto.Type;
 
             await _context.SaveChangesAsync();
 

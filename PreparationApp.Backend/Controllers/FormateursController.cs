@@ -1,19 +1,18 @@
 // FormateursController.cs
-// -----------------------------------------------------------------------------
-// Contrôleur pour gérer les requêtes liées aux formateurs.
+// Contrôleur permettant de gérer les requêtes liées aux formateurs.
 //
-// RÈGLES DE DROITS APPLIQUÉES (rôle "1" = admin, rôle "2" = formateur) :
-//   - Consulter la liste / un formateur (GET) : tout utilisateur connecté
-//     (formateur ou admin), car il est normal pour un formateur de voir
-//     ses collègues (ex: pour filtrer le catalogue par formateur).
-//   - Créer un formateur via ce contrôleur (POST) : réservé à l'admin,
-//     car l'inscription "normale" d'un nouveau formateur passe déjà par
-//     POST /api/auth/register (AuthController.cs).
-//   - Modifier le rôle d'un formateur (PUT .../role) : réservé à l'admin,
-//     c'est la seule façon de promouvoir un formateur en administrateur
-//     une fois qu'un premier admin existe déjà (voir le tout premier admin,
-//     créé manuellement en base de données via une requête SQL).
-// -----------------------------------------------------------------------------
+// Règles : rôle "1" = admin, rôle "2" = formateur :
+// a) Consulter la liste / un formateur (GET) : tout utilisateur connecté
+// (formateur ou admin), car il est normal pour un formateur de voir
+// ses collègues (ex. : pour filtrer le catalogue par formateur).
+// b) Créer un formateur via ce contrôleur (POST) : réservé à l'admin,
+// car l'inscription "normale" d'un nouveau formateur passe déjà par
+// POST /api/auth/register (AuthController.cs).
+// c) Modifier le rôle d'un formateur (PUT .../role) : réservé à l'admin,
+// c'est la seule façon de promouvoir un formateur en administrateur
+// une fois qu'un premier admin existe déjà (voir le tout premier admin,
+// créé manuellement en base de données via une requête SQL).
+
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,11 +32,11 @@ public class FormateursController : ControllerBase
         _context = context;
     }
 
-    // -------------------------------------------------------------------
+    
     // GET: api/formateurs
     // Récupère la liste de tous les formateurs.
-    // DROITS : tout utilisateur connecté (formateur ou admin).
-    // -------------------------------------------------------------------
+    // Règles : tout utilisateur connecté (formateur ou admin).
+    
     [Authorize]
     [HttpGet]
     public async Task<IActionResult> GetFormateurs()
@@ -53,11 +52,11 @@ public class FormateursController : ControllerBase
         }
     }
 
-    // -------------------------------------------------------------------
+
     // GET: api/formateurs/5
     // Récupère un formateur spécifique par son identifiant.
-    // DROITS : tout utilisateur connecté (formateur ou admin).
-    // -------------------------------------------------------------------
+    // Règles : tout utilisateur connecté (formateur ou admin).
+
     [Authorize]
     [HttpGet("{id}")]
     public async Task<IActionResult> GetFormateur(int id)
@@ -77,15 +76,15 @@ public class FormateursController : ControllerBase
         }
     }
 
-    // -------------------------------------------------------------------
+    
     // POST: api/formateurs
     // Crée un nouveau formateur directement (sans passer par le formulaire
     // d'inscription classique).
-    // DROITS : réservé à l'admin (policy "AdminOnly" définie dans Program.cs),
+    // Règles : réservé à l'admin (policy "AdminOnly" définie dans Program.cs),
     // car c'est une création "manuelle" typiquement utilisée pour qu'un
     // admin ajoute un compte à un collègue, en dehors du flux d'inscription
     // public POST /api/auth/register.
-    // -------------------------------------------------------------------
+    
     [Authorize(Policy = "AdminOnly")]
     [HttpPost]
     public async Task<IActionResult> CreateFormateur([FromBody] Formateur formateur)
@@ -111,16 +110,15 @@ public class FormateursController : ControllerBase
         }
     }
 
-    // -------------------------------------------------------------------
+    
     // PUT: api/formateurs/5/role
     // Modifie le rôle d'un formateur existant : le promouvoir administrateur
     // ("1"), ou le repasser formateur simple ("2").
-    //
-    // DROITS : réservé à l'admin (policy "AdminOnly"), car changer le rôle
+    // Règles : réservé à l'admin (policy "AdminOnly"), car changer le rôle
     // de quelqu'un est une action sensible qui ne doit jamais être
     // accessible à un formateur simple, même sur son propre compte
     // (sinon n'importe quel formateur pourrait s'auto-promouvoir admin).
-    // -------------------------------------------------------------------
+    
     [Authorize(Policy = "AdminOnly")]
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateRole(int id, [FromBody] UpdateRoleModel model)
@@ -153,10 +151,85 @@ public class FormateursController : ControllerBase
         }
     }
 
-    // -------------------------------------------------------------------
+    
+    // PUT: api/formateurs/5/deactivate
+    // Désactive un compte formateur ou admin (ex. : départ de l'entreprise).
+    // Le compte ne peut alors plus se connecter (vérifié dans
+    // AuthController.Login), mais toutes ses données (préparations
+    // créées/assignées, comptes-rendus, ressources) restent intactes en
+    // base : on ne supprime jms le formateur, on le marque seulement
+    // inactif. Son nom continue donc d'apparaître partout dans l'app,
+    // suffixé par "(compte désactivé)" via Formateur.DisplayName, pour
+    // que les autres formateurs et admins sachent toujours qui a fait quoi.
+    // Règles : réservé à l'admin (policy "AdminOnly"), même règle que pour
+    // UpdateRole — une action sensible sur le compte de quelqu'un d'autre.
+    
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("{id}/deactivate")]
+    public async Task<IActionResult> DeactivateFormateur(int id)
+    {
+        try
+        {
+            var formateur = await _context.Formateurs.FindAsync(id);
+            if (formateur == null)
+            {
+                return NotFound(new { Error = $"Aucun formateur trouvé avec l'identifiant {id}." });
+            }
+
+            if (!formateur.IsActive)
+            {
+                return BadRequest(new { Error = $"Le compte de {formateur.Name} est déjà désactivé." });
+            }
+
+            formateur.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = $"Le compte de {formateur.Name} a été désactivé. Ses préparations, comptes-rendus et ressources restent visibles." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = $"Erreur lors de la désactivation : {ex.Message}" });
+        }
+    }
+
+    
+    // PUT: api/formateurs/5/reactivate
+    // Réactive un compte précédemment désactivé (ex. : la personne revient,
+    // ou la désactivation était une erreur). Le formateur peut alors se
+    // reconnecter normalement.
+    // Règles/droits : réservé à l'admin (policy "AdminOnly").
+    
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("{id}/reactivate")]
+    public async Task<IActionResult> ReactivateFormateur(int id)
+    {
+        try
+        {
+            var formateur = await _context.Formateurs.FindAsync(id);
+            if (formateur == null)
+            {
+                return NotFound(new { Error = $"Aucun formateur trouvé avec l'identifiant {id}." });
+            }
+
+            if (formateur.IsActive)
+            {
+                return BadRequest(new { Error = $"Le compte de {formateur.Name} est déjà actif." });
+            }
+
+            formateur.IsActive = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = $"Le compte de {formateur.Name} a été réactivé." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = $"Erreur lors de la réactivation : {ex.Message}" });
+        }
+    }
+        
     // Modèle représentant le corps JSON attendu pour la route UpdateRole.
     // Exemple de requête envoyée par le frontend : { "role": "1" }
-    // -------------------------------------------------------------------
+    
     public class UpdateRoleModel
     {
         public string Role { get; set; } = string.Empty;

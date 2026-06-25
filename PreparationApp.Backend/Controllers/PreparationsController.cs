@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization; // [Authorize] pour protéger les rout
 using Microsoft.AspNetCore.Mvc;           // [ApiController], [HttpGet], [HttpPost], etc.
 using Microsoft.EntityFrameworkCore;      // Include, FirstOrDefaultAsync, ToListAsync...
 using PreparationApp.Backend.ModelsBD;    // Modèles Preparation, AppDbContext.
+using PreparationApp.Backend.ModelsBD.Dtos;
 using PreparationApp.Backend.Services;    // Service GoogleCalendarService.
 using System.Security.Claims;             // ClaimTypes pour lire les infos du token JWT.
 
@@ -85,17 +86,17 @@ public class PreparationsController : ControllerBase
                         EndDate = calendarEvent.End,
                         Status = "Upcoming",
                         // Le formateur & le créateur sont l'utilisateur
-                        // réellement connecté, et non plus une valeur fixe "1".
+                        // réellement connecté.
                         FormateurId = currentUserId,
                         CreatedById = currentUserId
                     };
                     _context.Preparations.Add(preparation);
                 }
-                // Si elle existe déjà, on ne fait rien : on évite de la dupliquer
+                // Si elle existe déjà, on ne fait rien pour éviter de la dupliquer
                 // ou d'écraser des données déjà saisies par le formateur.
             }
 
-            // On enregistre tous les ajouts en une seule fois en base de données.
+            // Enregistre tous les ajouts en une seule fois en base de données.
             await _context.SaveChangesAsync();
 
             return Ok(new { Message = "Préparations synchronisées avec Google Calendar." });
@@ -161,11 +162,11 @@ public class PreparationsController : ControllerBase
 
     [Authorize]
     [HttpPost]
-    public async Task<IActionResult> PostPreparation(Preparation preparation)
+    public async Task<IActionResult> PostPreparation(PreparationDto dto)
     {
         try
         {
-            // On récupère l'utilisateur connecté pour l'enregistrer comme créateur.
+            // Récupère l'utilisateur connecté pour l'enregistrer comme créateur.
             var currentUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(currentUserIdClaim))
             {
@@ -173,10 +174,40 @@ public class PreparationsController : ControllerBase
             }
             var currentUserId = int.Parse(currentUserIdClaim);
 
-            // On force le créateur à être l'utilisateur connecté, pour éviter
-            // qu'un utilisateur n'envoie un CreatedById différent du sien.
-            preparation.CreatedById = currentUserId;
-            preparation.CreatedAt = DateTime.UtcNow;
+            // Vérifie que le formateur assigné existe réellement, pour
+            // éviter une erreur de contrainte de clef étrangère 
+            // si le frontend envoie un FormateurId invalide.
+            var assignedFormateur = await _context.Formateurs.FindAsync(dto.FormateurId);
+            if (assignedFormateur == null)
+            {
+                return BadRequest(new { Error = $"Aucun formateur trouvé avec l'ID {dto.FormateurId}." });
+            }
+
+            // On ne peut pas assigner une nouvelle préparation à un compte
+            // désactivé (ex. : formateur qui a quitté l'entreprise). Les
+            // préparations déjà existantes pour ce formateur, elles,
+            // restent visibles normalement (voir Formateur.IsActive).
+            if (!assignedFormateur.IsActive)
+            {
+                return BadRequest(new { Error = $"{assignedFormateur.Name} a un compte désactivé : impossible de lui assigner une nouvelle préparation." });
+            }
+
+            // Mappe le DTO (champs saisis dans le formulaire) vers
+            // l'entité EF Core, puis il faut compléter nous-mêmes CreatedById et
+            // CreatedAt : le créateur doit toujours être l'utilisateur
+            // connecté, jamais une valeur envoyée par le frontend.
+            var preparation = new Preparation
+            {
+                Subject = dto.Subject,
+                Description = dto.Description,
+                FormateurId = dto.FormateurId,
+                StartDate = dto.StartDate,
+                EndDate = dto.EndDate,
+                Status = dto.Status,
+                GoogleEventId = dto.GoogleEventId,
+                CreatedById = currentUserId,
+                CreatedAt = DateTime.UtcNow,
+            };
 
             _context.Preparations.Add(preparation);
             await _context.SaveChangesAsync();
@@ -197,16 +228,10 @@ public class PreparationsController : ControllerBase
 
     [Authorize]
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutPreparation(int id, Preparation preparation)
+    public async Task<IActionResult> PutPreparation(int id, PreparationDto dto)
     {
         try
         {
-            // Vérifie que l'id dans l'URL correspond bien à l'id dans le corps de la requête.
-            if (id != preparation.Id)
-            {
-                return BadRequest(new { Error = "L'ID de la préparation ne correspond pas." });
-            }
-
             var currentUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(currentUserIdClaim))
             {
@@ -236,11 +261,36 @@ public class PreparationsController : ControllerBase
                 return Forbid(); // Renvoie un code 403 (Interdit).
             }
 
-            // Met à jour la date de dernière modif. automatiquement.
-            preparation.UpdatedAt = DateTime.UtcNow;
+            // Vérifie que le formateur assigné existe réellement.
+            var assignedFormateur = await _context.Formateurs.FindAsync(dto.FormateurId);
+            if (assignedFormateur == null)
+            {
+                return BadRequest(new { Error = $"Aucun formateur trouvé avec l'ID {dto.FormateurId}." });
+            }
 
-            // Indique à EF Core que cet objet a été modifié dans son ensemble.
-            _context.Entry(preparation).State = EntityState.Modified;
+            // On bloque seulement le cas où on tente de réassigner la
+            // préparation à un formateur désactivé. Si le formateur assigné
+            // ne change pas (dto.FormateurId == FormateurId d'origine), on
+            // laisse passer : sinon on ne pourrait plus du tout modifier les
+            // anciennes préparations d'un formateur qui a quitté l'entreprise
+            // (ex. : corriger une faute de frappe dans le sujet).
+            if (!assignedFormateur.IsActive && dto.FormateurId != existingPreparation.FormateurId)
+            {
+                return BadRequest(new { Error = $"{assignedFormateur.Name} a un compte désactivé : impossible de lui réassigner cette préparation." });
+            }
+
+            // Met à jour uniquement les champs modifiables par le
+            // formateur/admin. CreatedById et CreatedAt restent ceux de
+            // l'entité existante en base, jamais ceux du DTO.
+            existingPreparation.Subject = dto.Subject;
+            existingPreparation.Description = dto.Description;
+            existingPreparation.FormateurId = dto.FormateurId;
+            existingPreparation.StartDate = dto.StartDate;
+            existingPreparation.EndDate = dto.EndDate;
+            existingPreparation.Status = dto.Status;
+            existingPreparation.GoogleEventId = dto.GoogleEventId;
+            existingPreparation.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
             // 204 No Content = la mise à jour a réussi, il n'y a rien à renvoyer.
@@ -250,7 +300,7 @@ public class PreparationsController : ControllerBase
         {
             // Cette exception arrive si la préparation a été supprimée
             // entre le moment où on l'a lue et le moment où on a essayé de la sauvegarder.
-           
+
             if (!PreparationExists(id))
             {
                 return NotFound(new { Error = $"La préparation avec l'ID {id} n'existe plus." });

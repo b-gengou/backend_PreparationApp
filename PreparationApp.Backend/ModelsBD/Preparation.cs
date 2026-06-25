@@ -29,18 +29,27 @@ public class Preparation
     [Required(ErrorMessage = "Le formateur est obligatoire pour une préparation.")]
     public int FormateurId { get; set; }
 
-    // Objet Formateur associé à cette préparation (propriété de navigation).
+    // Propriété de navigation rendue explicitement nullable
+    // (Formateur? au lieu de Formateur). Sans ce nullable "?", ASP.NET Core exigeait
+    // que le frontend fournisse un objet "formateur" complet dans le corps
+    // de la requête POST/PUT, en plus de "formateurId" — ce qui provoquait
+    // une erreur 400 ("The Formateur field is required") même lorsque
+    // formateurId était correctement indiqué. EF Core continue de
+    // charger cet objet automatiquement depuis la base via FormateurId
+    // quand on utilise .Include(p => p.Formateur) dans un contrôleur GET ;
+    // cette correction ne change que la validation du modèle en entrée.
+
     [ForeignKey("FormateurId")]
-    public Formateur Formateur { get; set; } = null!;
+    public Formateur? Formateur { get; set; }
 
     // Id. du formateur qui a créé cette préparation (clef étrangère).
     // Utilisé pour vérifier les droits d'accès (seul le créateur ou un admin peut modifier/supprimer).
     [Required(ErrorMessage = "Le créateur de la préparation est obligatoire.")]
     public int CreatedById { get; set; }
 
-    // Objet Formateur qui a créé cette préparation (propriété de navigation).
+    // idem que pour Formateur ci-dessus (nullable).
     [ForeignKey("CreatedById")]
-    public Formateur CreatedBy { get; set; } = null!;
+    public Formateur? CreatedBy { get; set; }
 
     // Date et heure de début de la préparation.
     // Obligatoire pour planifier la session.
@@ -80,12 +89,14 @@ public class Preparation
 
     // Ignore les boucles de référence lors de la sérialisation JSON.
     // Évite les erreurs de sérialisation circulaire (ex: Preparation -> Formateur -> Preparation).
+    // Ici : nullable également, car ces propriétés dérivent directement
+    // de Formateur/CreatedBy ci-dessus, qui sont désormais nullables.
     [JsonIgnore]
     [NotMapped]
-    public Formateur FormateurReference => Formateur;
+    public Formateur? FormateurReference => Formateur;
 
     // Ignore les boucles de référence pour le créateur lors de la sérialisation JSON.
     [JsonIgnore]
     [NotMapped]
-    public Formateur CreatedByReference => CreatedBy;
+    public Formateur? CreatedByReference => CreatedBy;
 }
