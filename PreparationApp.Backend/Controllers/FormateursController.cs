@@ -1,6 +1,4 @@
-// FormateursController.cs
 // Contrôleur permettant de gérer les requêtes liées aux formateurs.
-//
 // Règles : rôle "1" = admin, rôle "2" = formateur :
 // a) Consulter la liste / un formateur (GET) : tout utilisateur connecté
 // (formateur ou admin), car il est normal pour un formateur de voir
@@ -9,9 +7,9 @@
 // car l'inscription "normale" d'un nouveau formateur passe déjà par
 // POST /api/auth/register (AuthController.cs).
 // c) Modifier le rôle d'un formateur (PUT .../role) : réservé à l'admin,
-// c'est la seule façon de promouvoir un formateur en administrateur
+// seule façon de promouvoir un formateur en administrateur
 // une fois qu'un premier admin existe déjà (voir le tout premier admin,
-// créé manuellement en base de données via une requête SQL).
+// créé manuellement en BD via une requête SQL).
 
 
 using Microsoft.AspNetCore.Authorization;
@@ -81,7 +79,7 @@ public class FormateursController : ControllerBase
     // Crée un nouveau formateur directement (sans passer par le formulaire
     // d'inscription classique).
     // Règles : réservé à l'admin (policy "AdminOnly" définie dans Program.cs),
-    // car c'est une création "manuelle" typiquement utilisée pour qu'un
+    // car c'est une création "manuelle" utilisée pour qu'un
     // admin ajoute un compte à un collègue, en dehors du flux d'inscription
     // public POST /api/auth/register.
     
@@ -139,6 +137,25 @@ public class FormateursController : ControllerBase
                 return NotFound(new { Error = $"Aucun formateur trouvé avec l'identifiant {id}." });
             }
 
+            // Super protection : on ne peut jms retirer le statut admin au
+            // au dernier administrateur actif. 
+            // On ne bloque que la rétrogradation ("1" -> "2") d'un admin
+            // qui est actuellement le dernier admin actif restant ; promouvoir
+            // un formateur en admin ("2" -> "1") n'est, lui, jamais bloqué.
+            if (formateur.Role == "1" && model.Role == "2")
+            {
+                var activeAdminCount = await _context.Formateurs
+                    .CountAsync(f => f.Role == "1" && f.IsActive);
+
+                // Si ce formateur est lui-même actif et qu'il est le seul
+                // admin actif compté, le rétrograder le ferait disparaître :
+                // on bloque ce cas précis.
+                if (formateur.IsActive && activeAdminCount <= 1)
+                {
+                    return BadRequest(new { Error = $"Impossible de retirer le statut administrateur à {formateur.Name} : il s'agit du dernier administrateur actif. Promouvez d'abord un autre formateur en administrateur." });
+                }
+            }
+
             // Mise à jour du rôle, puis sauvegarde en base.
             formateur.Role = model.Role;
             await _context.SaveChangesAsync();
@@ -155,9 +172,11 @@ public class FormateursController : ControllerBase
     // PUT: api/formateurs/5/deactivate
     // Désactive un compte formateur ou admin (ex. : départ de l'entreprise).
     // Le compte ne peut alors plus se connecter (vérifié dans
-    // AuthController.Login), mais toutes ses données (préparations
+    // AuthController.Login).
+    // Toutes ses données (préparations
     // créées/assignées, comptes-rendus, ressources) restent intactes en
-    // base : on ne supprime jms le formateur, on le marque seulement
+    // base.
+    // Résultat, on ne supprime jms le formateur, on le marque seulement
     // inactif. Son nom continue donc d'apparaître partout dans l'app,
     // suffixé par "(compte désactivé)" via Formateur.DisplayName, pour
     // que les autres formateurs et admins sachent toujours qui a fait quoi.
@@ -179,6 +198,22 @@ public class FormateursController : ControllerBase
             if (!formateur.IsActive)
             {
                 return BadRequest(new { Error = $"Le compte de {formateur.Name} est déjà désactivé." });
+            }
+
+            // !!! Même règle que pour UpdateRole (voir le
+            // commentaire détaillé dans cette méthode). Désactiver le
+            // dernier administrateur actif aurait exactement le même effet
+            // de fou que le rétrograder : plus personne ne pourrait plus
+            // se connecter en tant qu'admin pour réactiver quelqu'un (sauf en BD).
+            if (formateur.Role == "1")
+            {
+                var activeAdminCount = await _context.Formateurs
+                    .CountAsync(f => f.Role == "1" && f.IsActive);
+
+                if (activeAdminCount <= 1)
+                {
+                    return BadRequest(new { Error = $"Impossible de désactiver {formateur.Name} : il s'agit du dernier administrateur actif. Promouvez d'abord un autre formateur en administrateur." });
+                }
             }
 
             formateur.IsActive = false;
